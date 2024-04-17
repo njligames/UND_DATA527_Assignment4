@@ -4,522 +4,362 @@
 # DEADLINE: April 11, 2024
 # Spring 2024
 
-from matplotlib import pyplot
-import math
-from math import cos, sin, atan
-import os
-import random
-import matplotlib.pyplot as plt;
-import json
+import numpy as np
+from scipy.stats import zscore
+import csv
+import datetime
+from enum import Enum 
 
-## View
+class CarPricePredictor:
+    def __init__(self):
+        self.price = {}
+        self.fuelType = {}
+        self.transmission = {}
+        self.ownership = {}
+        self.manufacture = {}
+        self.engine = {}
+        self.seats = {}
 
-class NeuronView():
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+    def open(self, filename):
+        with open(filename, 'r') as f:
+            reader = csv.reader(f)
+            self.data = []
+            for row in reader:
+                self.data.append(row)
 
-    def draw(self, neuron_radius):
-        font = {
-            'family': 'serif',
-            'color':  'black',
-            'weight': 'normal',
-            'size': 8,
-        }
-        circle = pyplot.Circle((self.x, self.y), radius=neuron_radius, fill=False)
-        pyplot.gca().add_patch(circle)
-        pyplot.text(self.x, self.y,  self.get_neuron_text(), horizontalalignment='center', verticalalignment='center', fontdict=font)
+    def predictPrice(self, milage, fuelType, transmission, ownership, manufactureYear, engine, seats):
+        def validateMilage(var):
+            if var < self.kms_min:
+                return False
+            if var > self.kms_max:
+                return False
+            return True
+        def validateFuelType(var):
+            if var < self.fuelType_min:
+                return False
+            if var > self.fuelType_max:
+                return False
+            return True
+        def validateTransmission(var):
+            if var < self.transmission_min:
+                return False
+            if var > self.transmission_max:
+                return False
+            return True
+        def validateOwnership(var):
+            if var < self.ownership_min:
+                return False
+            if var > self.ownership_max:
+                return False
+            return True
+        def validateManufactureYear(var):
+            if var < self.manufacture_min:
+                return False
+            if var > self.manufacture_max:
+                return False
+            return True
+        def validateEngine(var):
+            if var < self.engine_min:
+                return False
+            if var > self.engine_max:
+                return False
+            return True
+        def validateSeats(var):
+            if var < self.seats_min:
+                return False
+            if var > self.seats_max:
+                return False
+            return True
 
-    def get_neuron_text(self):
-        return "0.0"#"{}\n{}".format(self.x, self.y)
+        valid = validateMilage(milage)
+        valid = valid and validateFuelType(fuelType)
+        valid = valid and validateTransmission(fuelType)
+        valid = valid and validateOwnership(fuelType)
+        valid = valid and validateManufactureYear(fuelType)
+        valid = valid and validateEngine(fuelType)
+        valid = valid and validateSeats(fuelType)
 
-class LayerView():
-    def __init__(self, network, number_of_neurons, number_of_neurons_in_widest_layer):
-        self.scale = 1
-        self.vertical_distance_between_layers = 6 * self.scale
-        self.horizontal_distance_between_neurons = 2 * self.scale
-        self.neuron_radius = 0.5 * self.scale
-        self.number_of_neurons_in_widest_layer = number_of_neurons_in_widest_layer
-        self.previous_layer = self.__get_previous_layer(network)
-        self.y = self.__calculate_layer_y_position()
-        self.neurons = self.__intialise_neurons(number_of_neurons)
+        if valid:
+            return 0.0
+        return None 
 
-    def __create_neuron(self):
-        return NeuronView(self.x, self.y)
+    def __processCarName(self, var):
+        return var
 
-    def __intialise_neurons(self, number_of_neurons):
-        neurons = []
-        self.x = self.__calculate_left_margin_so_layer_is_centered(number_of_neurons)
-        for iteration in range(number_of_neurons):
-            neuron = self.__create_neuron()
-            neurons.append(neuron)
-            self.x += self.horizontal_distance_between_neurons
-        return neurons
-
-    def __calculate_left_margin_so_layer_is_centered(self, number_of_neurons):
-        return self.horizontal_distance_between_neurons * (self.number_of_neurons_in_widest_layer - number_of_neurons) / 2
-
-    def __calculate_layer_y_position(self):
-        if self.previous_layer:
-            return self.previous_layer.y + self.vertical_distance_between_layers
-        else:
-            return 0
-
-    def __get_previous_layer(self, network):
-        if len(network.layers) > 0:
-            return network.layers[-1]
-        else:
+    def __processCarPrice(self, var):
+        if "car prices (in rupee)" == var.strip().lower():
+            return None
+        words = str(var).split(' ')
+        if len(words) != 2:
             return None
 
-    def __line_between_two_neurons(self, neuron1, neuron2):
-        angle = atan((neuron2.x - neuron1.x) / float(neuron2.y - neuron1.y))
-        x_adjustment = self.neuron_radius * sin(angle)
-        y_adjustment = self.neuron_radius * cos(angle)
-        line = pyplot.Line2D((neuron1.x - x_adjustment, neuron2.x + x_adjustment), (neuron1.y - y_adjustment, neuron2.y + y_adjustment))
-        pyplot.gca().add_line(line)
+        var = float(words[0])
+        scale = words[1]
+        if "Lakh" == scale:
+            var = var * 100_000
+        if "Crore" == scale:
+            var = var * 10_000_000
 
-    def draw(self, layerType=0):
-        for neuron in self.neurons:
-            neuron.draw( self.neuron_radius )
-            if self.previous_layer:
-                for previous_layer_neuron in self.previous_layer.neurons:
-                    self.__line_between_two_neurons(neuron, previous_layer_neuron)
-        # write Text
-        x_text = self.number_of_neurons_in_widest_layer * self.horizontal_distance_between_neurons
-        if layerType == 0:
-            pyplot.text(x_text, self.y, 'Input Layer', fontsize = 12)
-        elif layerType == -1:
-            pyplot.text(x_text, self.y, 'Output Layer', fontsize = 12)
+        # 0.012 United States Dollar
+        conversion = 0.012
+        var = var * conversion
+
+        if scale in self.price.keys():
+            self.price[scale] += 1
         else:
-            pyplot.text(x_text, self.y, 'Hidden Layer '+str(layerType), fontsize = 12)
+            self.price[scale] = 1
 
-class NeuralNetworkView():
-    def __init__(self, number_of_neurons_in_widest_layer):
-        self.number_of_neurons_in_widest_layer = number_of_neurons_in_widest_layer
-        self.layers = []
-        self.layertype = 0
+        return var
 
-    def __create_layer(self, number_of_neurons):
-        return LayerView(self, number_of_neurons, self.number_of_neurons_in_widest_layer)
+    def __processMilage(self, var):
+        if "kms driven" == var.strip().lower():
+            return None
 
-    def add_layer(self, number_of_neurons ):
-        layer = self.__create_layer(number_of_neurons)
-        self.layers.append(layer)
+        words = var.split(' ')
+        var = int(words[0].replace(',', ''))
 
-    def draw(self):
-        pyplot.figure()
-        for i in range( len(self.layers) ):
-            layer = self.layers[i]
-            if i == len(self.layers)-1:
-                i = -1
-            layer.draw( i )
-        pyplot.axis('scaled')
-        pyplot.axis('off')
-        pyplot.title( 'Neural Network architecture', fontsize=15 )
-        pyplot.show()
+        return var
 
-## Model
+    def __processFuelType(self, var):
+        if "fuel type" == var.strip().lower():
+            return None
 
-class NeuronEdge():
-    def __init__(self, neuron):
-        self.neuron = neuron
-
-class Neuron(NeuronView):
-    def __init__(self, x, y):
-        super().__init__(x, y)
-
-        # neurons coming from previous layer
-        self.parents = []
-
-        # neurons going to the next layer
-        self.children = []
-
-        # weights between current neuron to child neuron
-        self.weights = []
-
-        self.bias = 0
-
-    def __str__(self):
-        return "{\"bias\":" + str(self.bias) + ",\"weights\":" + str(self.weights) + "}"
-
-    def __repr__(self):
-        return self.__str__()
-
-    def get_number_of_children(self):
-        return len(self.children)
-
-    def get_child_neuron(self, index):
-        if index >= 0 and index < len(self.children):
-            return self.children[index].neuron
-        return None
-
-    def get_number_of_parents(self):
-        return len(self.parents)
-
-    def get_parent_neuron(self, index):
-        if index >= 0 and index < len(self.parents):
-            return self.parents[index].neuron
-        return None
-
-    def get_neuron_text(self):
-        return "{}".format(self.bias)
-
-    def calculate(self, idx_neuron, activation_func = None):
-        current_sum = 0
-        for idx in range(0, self.get_number_of_parents()):
-            current_sum += self.get_parent_neuron(idx).weights[idx_neuron] * self.get_parent_neuron(idx).bias
-
-        if None != activation_func:
-            self.bias = activation_func(current_sum)
+        if var in self.fuelType.keys():
+            self.fuelType[var] += 1
         else:
-            self.bias = current_sum
+            self.fuelType[var] = 1
 
-class Layer(LayerView):
-    def __init__(self, network, number_of_neurons, number_of_neurons_in_widest_layer):
-        super().__init__(network, number_of_neurons, number_of_neurons_in_widest_layer)
-        self.__init_layer()
+        return self.FuelType[var.lower()].value
+        # {'Fuel Type': 1, 'Diesel': 2423, 'Petrol': 2967, 'Cng': 80, 'Electric': 14, 'Lpg': 28}
 
-    def __str__(self):
-        s = "{\"neurons\":  " + str(self.neurons) + " }"
-        return s
+    class FuelType(Enum):
+        diesel = 1
+        petrol = 2
+        cng = 3
+        electric = 4
+        lpg = 5
 
-    def __repr__(self):
-        return self.__str__()
+    def __processTransmission(self, var):
+        if "transmission" == var.strip().lower():
+            return None
 
-    def __init_layer(self):
-        if None != self.previous_layer:
-            for prev_neuron in self.previous_layer.neurons:
-                for neuron in self.neurons:
-                    prev_neuron.weights.append(random.random())
+        if var in self.transmission.keys():
+            self.transmission[var] += 1
+        else:
+            self.transmission[var] = 1
 
-        for neuron in self.neurons:
-            if None != self.previous_layer:
-                # init children of previous layer neurons
-                for prev_neuron in self.previous_layer.neurons:
-                    prev_neuron.children.append(NeuronEdge(neuron))
-                # init parents of current layer neurons
-                for prev_neuron in self.previous_layer.neurons:
-                    neuron.parents.append(NeuronEdge(prev_neuron))
+        return self.Transmission[var.lower()].value
+        # {'Transmission': 1, 'Manual': 3962, 'Automatic': 1550}
 
-    def _LayerView__create_neuron(self):
-        return Neuron(self.x, self.y)
+    class Transmission(Enum):
+        manual = 1
+        automatic = 2
 
-    def get_number_of_neurons(self):
-        return len(self.neurons)
+    def __processOwnership(self, var):
+        if "ownership" == var.strip().lower():
+            return None
 
-    def get_neuron(self, index):
-        if index >= 0 and index < len(self.neurons):
-            return self.neurons[index]
-        return None
+        if var in self.ownership.keys():
+            self.ownership[var] += 1
+        else:
+            self.ownership[var] = 1
+        idx = "_" + var.replace(" ", "")
+        if "_0thOwner" == idx:
+            return None
+        # {'Ownership': 1, '1st Owner': 3736, '2nd Owner': 1314, '3rd Owner': 359, '4th Owner': 84, '5th Owner': 12, '0th Owner': 7}
+        return self.Ownership[idx.lower()].value
 
+    class Ownership(Enum):
+        _1stowner = 1
+        _2ndowner = 2
+        _3rdowner = 3
+        _4thowner = 4
+        _5thowner = 5
 
-
-class NeuralNetwork(NeuralNetworkView):
-    def __init__(self, number_of_neurons_in_widest_layer):
-        super().__init__(number_of_neurons_in_widest_layer)
-
-    def __str__(self):
-        s = "{\"layers\":  " + str(self.layers) + " }"
-        return s
-
-
-    def _NeuralNetworkView__create_layer(self, number_of_neurons):
-        return Layer(self, number_of_neurons, self.number_of_neurons_in_widest_layer)
-
-    def get_number_of_layers(self):
-        return len(self.layers)
-
-    def get_layer(self, index):
-        if index >= 0 and index < len(self.layers):
-            return self.layers[index]
-        return None
-
-    def get_output_layer(self):
-        return self.get_layer(self.get_number_of_layers() - 1)
-
-
-class Model():
-    def __init__( self, neural_network ):
-        self.neural_network = neural_network
-        widest_layer = max( self.neural_network )
-        self.network = NeuralNetwork( widest_layer )
-        for l in self.neural_network:
-            self.network.add_layer(l)
-
-    def __str__(self):
-        return str(self.network)
-
-    def draw( self ):
-        self.network.draw()
-
-    def get_input_neuron(self, index):
-        if self.network.get_number_of_layers() > 0 and index >= 0 and index < self.network.get_layer(0).get_number_of_neurons():
-            return self.network.get_layer(0).get_neuron(index)
-        return None
-
-    def feed_forward(self, inputs):
-        ########################
-        # feed the neural network with the input: the output of each node in the hidden
-        # layers and the output layer is calculated
-        ########################
-
-        input_neurons = []
-        input_neurons.append(self.get_input_neuron(0))
-        input_neurons.append(self.get_input_neuron(1))
-
-        input_neurons[0].bias = inputs[0]
-        input_neurons[1].bias = inputs[1]
-
-        def sigmoid(x):
-            return 1 / (1 + math.exp(-x))
-
-        self.network.get_layer(1).get_neuron(0).calculate(0, sigmoid)
-        self.network.get_layer(1).get_neuron(1).calculate(1, sigmoid)
-        self.network.get_layer(2).get_neuron(0).calculate(0)
-
-        output_layer = self.network.get_output_layer()
-        neuron = output_layer.get_neuron(0)
-        return neuron.bias
-
-    def back_propagate(self, error, LR):
-        ########################
-        # backpropagate the error and calculate the derivative with the respect to each weight
-        ########################
-
-        output_layer = self.network.get_output_layer()
-        neuron = output_layer.get_neuron(0)
-
-        output_o1 = output_layer.get_neuron(0).bias
-        w5        = neuron.get_parent_neuron(0).weights[0]
-        w6        = neuron.get_parent_neuron(1).weights[0]
-        output_h1 = neuron.get_parent_neuron(0).bias
-        output_h2 = neuron.get_parent_neuron(1).bias
-        output_i1 = neuron.get_parent_neuron(0).get_parent_neuron(0).bias
-        output_i2 = neuron.get_parent_neuron(0).get_parent_neuron(1).bias
-
-        # w5
-        # delta_w5 = error * [output_o1 * (1 - output_o1)] * output_h1
-        delta_w5 = error * (output_o1 * (1 - output_o1)) * output_h1
-
-        # w6
-        # delta_w6 = error * [output_o1 * (1 - output_o1)] * output_h2
-        delta_w6 = error * (output_o1 * (1 - output_o1)) * output_h2
-
-        # w1
-        # deltaE_w1 = error * [output_o1 * (1 - output_o1)] * w5
-        deltaE_w1 = error * (output_o1 * (1 - output_o1)) * w5
-        # delta_w1 = deltaE_w1 * (output_h1 * (1 - output_h1)) * output_i1
-        delta_w1 = deltaE_w1 * (output_h1 * (1 - output_h1)) * output_i1
-
-        # w2
-        # deltaE_w2 = error * [output_o1 * (1 - output_o1)] * w6
-        deltaE_w2 = error * (output_o1 * (1 - output_o1)) * w6
-        # delta_w2 = deltaE_w2 * (output_h2 * (1 - output_h2)) * output_i1
-        delta_w2 = deltaE_w2 * (output_h2 * (1 - output_h2)) * output_i1
-
-        # w3
-        # deltaE_w3 = error * [output_o1 * (1 - output_o1)] * w5
-        deltaE_w3 = error * (output_o1 * (1 - output_o1)) * w5
-        # delta_w3 = deltaE_w3 * (output_h1 * (1 - output_h1)) * output_i2
-        delta_w3 = deltaE_w3 * (output_h1 * (1 - output_h1)) * output_i2
-
-        # w4
-        # deltaE_w4 = error * [output_o1 * (1 - output_o1)] * w6
-        deltaE_w4 = error * (output_o1 * (1 - output_o1)) * w6
-        # delta_w4 = deltaE_w4 * (output_h2 * (1 - output_h2)) * output_i2
-        delta_w4 = deltaE_w4 * (output_h2 * (1 - output_h2)) * output_i2
-
-        ###################
-        # update each weight
-        ###################
-
-        # w5_new = w5_old - (LR * delta_w5)
-        neuron.get_parent_neuron(0).weights[0] = neuron.get_parent_neuron(0).weights[0] - (LR * delta_w5)
-        # w6_new = w6_old - (LR * delta_w6)
-        neuron.get_parent_neuron(1).weights[0] = neuron.get_parent_neuron(1).weights[0] - (LR * delta_w6)
-
-        # w1_new = w1_old - (LR * delta_w1)
-        neuron.get_parent_neuron(0).get_parent_neuron(0).weights[0] = neuron.get_parent_neuron(0).get_parent_neuron(0).weights[0] - (LR * delta_w1)
-        # w2_new = w2_old - (LR * delta_w2)
-        neuron.get_parent_neuron(0).get_parent_neuron(0).weights[1] = neuron.get_parent_neuron(0).get_parent_neuron(0).weights[1] - (LR * delta_w2)
-        # w3_new = w3_old - (LR * delta_w3)
-        neuron.get_parent_neuron(0).get_parent_neuron(1).weights[0] = neuron.get_parent_neuron(0).get_parent_neuron(1).weights[0] - (LR * delta_w3)
-        # w4_new = w4_old - (LR * delta_w4)
-        neuron.get_parent_neuron(0).get_parent_neuron(1).weights[1] = neuron.get_parent_neuron(0).get_parent_neuron(1).weights[1] - (LR * delta_w4)
-
-    def __RMSE(self, dependantVariables, predictedArray):
-        if len(dependantVariables) != len(predictedArray):
-            raise ValueError("Length of dependant  values and predicted values must be the same.")
-
-        m = len(dependantVariables)
-        def step2Function(actual, predicted):
-            return (predicted - actual) ** 2
-        return math.sqrt(sum(step2Function(actual, predicted) for actual, predicted in zip(predictedArray, dependantVariables)) / (m))
-
-    def iterate(self, inputs, outputs, LR):
-        errors = [0] * len(inputs)
-        predictedArray = [0] * len(inputs)
-        for idx in range(0, len(inputs)):
-            predictedArray[idx] = self.feed_forward(inputs[idx])
-            errors[idx] = (outputs[idx] - predictedArray[idx])
-
-        rmse_error = self.__RMSE(outputs, predictedArray)
-
-        for error in errors:
-            self.back_propagate(error, LR)
-
-        return rmse_error
-
-    def iterate_training(self, inputs, outputs, LR):
-
-        predicted = outputs[0]
-
-        self.feed_forward(inputs)
-
-        ########################
-        # calculate the error, which is the estimated – the actual value
-        ########################
-        output_layer = self.network.get_output_layer()
-        neuron = output_layer.get_neuron(0)
-        actual    = neuron.bias
-
-        error = (predicted - actual)
-
-        ########################
-        # backpropagate the error and calculate the derivative with the respect to each weight
-        ########################
-
-        output_o1 = output_layer.get_neuron(0).bias
-        w5        = neuron.get_parent_neuron(0).weights[0]
-        output_h1 = neuron.get_parent_neuron(0).bias
-        output_h2 = neuron.get_parent_neuron(1).bias
-        output_i1 = neuron.get_parent_neuron(0).get_parent_neuron(0).bias
-        output_i2 = neuron.get_parent_neuron(0).get_parent_neuron(1).bias
-
-        # w5
-        # delta_w5 = error * [output_o1 * (1 - output_o1)] * output_h1
-        delta_w5 = error * (output_o1 * (1 - output_o1)) * output_h1
-
-        # w6
-        # delta_w6 = error * [output_o1 * (1 - output_o1)] * output_h2
-        delta_w6 = error * (output_o1 * (1 - output_o1)) * output_h2
-
-        # w1
-        # deltaE_w1 = error * [output_o1 * (1 - output_o1)] * w5
-        deltaE_w1 = error * (output_o1 * (1 - output_o1)) * neuron.get_parent_neuron(0).weights[0]
-        # delta_w1 = deltaE_w1 * (output_h1 * (1 - output_h1)) * output_i1
-        delta_w1 = deltaE_w1 * (output_h1 * (1 - output_h1)) * output_i1
-
-        # w2
-        # deltaE_w2 = error * [output_o1 * (1 - output_o1)] * w6
-        deltaE_w2 = error * (output_o1 * (1 - output_o1)) * neuron.get_parent_neuron(1).weights[0]
-        # delta_w2 = deltaE_w2 * (output_h2 * (1 - output_h2)) * output_i1
-        delta_w2 = deltaE_w2 * (output_h2 * (1 - output_h2)) * output_i1
-
-        # w3
-        # deltaE_w3 = error * [output_o1 * (1 - output_o1)] * w5
-        deltaE_w3 = error * (output_o1 * (1 - output_o1)) * neuron.get_parent_neuron(0).weights[0]
-        # delta_w3 = deltaE_w3 * (output_h1 * (1 - output_h1)) * output_i2
-        delta_w3 = deltaE_w3 * (output_h1 * (1 - output_h1)) * output_i2
-
-        # w4
-        # deltaE_w4 = error * [output_o1 * (1 - output_o1)] * w6
-        deltaE_w4 = error * (output_o1 * (1 - output_o1)) * neuron.get_parent_neuron(1).weights[0]
-        # delta_w4 = deltaE_w4 * (output_h2 * (1 - output_h2)) * output_i2
-        delta_w4 = deltaE_w4 * (output_h2 * (1 - output_h2)) * output_i2
-
-        ###################
-        # update each weight
-        ###################
-
-        # w5_new = w5_old - (LR * delta_w5)
-        neuron.get_parent_neuron(0).weights[0] = neuron.get_parent_neuron(0).weights[0] - (LR * delta_w5)
-        # w6_new = w6_old - (LR * delta_w6)
-        neuron.get_parent_neuron(1).weights[0] = neuron.get_parent_neuron(1).weights[0] - (LR * delta_w6)
-
-        # w1_new = w1_old - (LR * delta_w1)
-        neuron.get_parent_neuron(0).get_parent_neuron(0).weights[0] = neuron.get_parent_neuron(0).get_parent_neuron(0).weights[0] - (LR * delta_w1)
-        # w2_new = w2_old - (LR * delta_w2)
-        neuron.get_parent_neuron(0).get_parent_neuron(0).weights[1] = neuron.get_parent_neuron(0).get_parent_neuron(0).weights[1] - (LR * delta_w2)
-        # w3_new = w3_old - (LR * delta_w3)
-        neuron.get_parent_neuron(0).get_parent_neuron(1).weights[0] = neuron.get_parent_neuron(0).get_parent_neuron(1).weights[0] - (LR * delta_w3)
-        # w4_new = w4_old - (LR * delta_w4)
-        neuron.get_parent_neuron(0).get_parent_neuron(1).weights[1] = neuron.get_parent_neuron(0).get_parent_neuron(1).weights[1] - (LR * delta_w4)
-
-def calculate_r_squared(y_true, y_pred):
-    if len(y_true) != len(y_pred):
-        raise ValueError("Length of dependant values and predicted values must be the same.")
-
-    # Calculate the mean of the true values
-    mean_y_true = sum(y_true) / len(y_true)
-
-    # Calculate the total sum of squares (TSS) without using sum
-    tss = 0
-    for y in y_true:
-        tss += (y - mean_y_true) ** 2
-
-    # Calculate the residual sum of squares (RSS) without using sum
-    rss = 0
-    for true_val, pred_val in zip(y_true, y_pred):
-        rss += (true_val - pred_val) ** 2
-
-    # Calculate R-squared
-    r_squared = 1 - (rss / tss)
-
-    return r_squared
-
-def train_neural_network(independentVariablesArray, dependantVariables, LR = 0.001, N = 10000):
-    model = Model( [2,2,1] )
-    errorArray = []
-
-    for n in range(N):
-        error = model.iterate(independentVariablesArray, dependantVariables, LR)
-        errorArray.append(error)
-    return model, errorArray
-
-def estimate_r_squared(model, independentVariablesArray, dependantVariables):
-    predictedArray = []
-    for independentVariable in independentVariablesArray:
-        predictedArray.append(model.feed_forward(independentVariable))
-    rValue = calculate_r_squared(dependantVariables, predictedArray)
-    return rValue
-
-def use_model(model, a, b):
-    return model.feed_forward([a, b])
+    def __processManufacture(self, var):
+        if "manufacture" == var.strip().lower():
+            return None
+
+        if var in self.manufacture.keys():
+            self.manufacture[var] += 1
+        else:
+            self.manufacture[var] = 1
+
+        today = datetime.date.today()
+
+        return today.year - int(var)
+
+    def __processEngine(self, var):
+        if "engine" == var.strip().lower():
+            return None
+
+        words = var.split(' ')
+        var = int(words[0])
+
+        if var in self.engine.keys():
+            self.engine[var] += 1
+        else:
+            self.engine[var] = 1
+
+        return var
+
+    def __processSeats(self, var):
+        if "seats" == var.strip().lower():
+            return None
+
+        if var in self.seats.keys():
+            self.seats[var] += 1
+        else:
+            self.seats[var] = 1
+
+        # {'Seats': 1, '5 Seats': 4673, '6 Seats': 61, '7 Seats': 631, '4 Seats': 88, '8 Seats': 54, '2 Seats': 5}
+        idx = "_" + var.replace(" ", "")
+        return self.Seats[idx.lower()].value
+
+    class Seats(Enum):
+        _2seats = 2
+        _4seats = 4
+        _5seats = 5
+        _6seats = 6
+        _7seats = 7
+        _8seats = 8
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def process(self):
+
+        preprocessed_data = []
+        self.Y = []
+        # Car Name,Car Prices (In rupee),kms Driven,Fuel Type,Transmission,Ownership, Manufacture,Engine,Seats
+        for i in range(0, len(self.data)):
+            # self.data[i][0] = processCarName(self.data[i][0])
+            self.data[i][1] = self.__processCarPrice(self.data[i][1])
+            # print(self.data[i][1])
+            self.data[i][2] = self.__processMilage(self.data[i][2])
+            # print(self.data[i][2])
+            self.data[i][3] = self.__processFuelType(self.data[i][3])
+            # print(self.data[i][3])
+            self.data[i][4] = self.__processTransmission(self.data[i][4])
+            self.data[i][5] = self.__processOwnership(self.data[i][5])
+            self.data[i][6] = self.__processManufacture(self.data[i][6])
+            self.data[i][7] = self.__processEngine(self.data[i][7])
+            self.data[i][8] = self.__processSeats(self.data[i][8])
+
+            if None != self.data[i][1] and None != self.data[i][2] and None != self.data[i][3] and None != self.data[i][4] and None != self.data[i][5] and None != self.data[i][6] and None != self.data[i][7] and None != self.data[i][8]:
+                self.Y.append(self.data[i][1])
+                preprocessed_data.append(
+                    [
+                        # self.data[i][0], # Car Name
+                        # self.data[i][1], # Car Prices (In rupee)
+                        self.data[i][2], # kms Driven
+                        self.data[i][3], # Fuel Type
+                        self.data[i][4], # Transmission
+                        self.data[i][5], # Ownership
+                        self.data[i][6], # Manufacture
+                        self.data[i][7], # Engine
+                        self.data[i][8], # Seats
+                    ])
+
+        """
+        Normalize the array using min-max scaling..
+
+        Parameters:
+        - ary: List of values.
+
+        Returns:
+        - list: Normalized Array.
+        """
+        def normalizeMinMaxScaling(ary):
+            if len(ary) > 0:
+                _max = max(ary)
+                _min = min(ary)
+                new_ary = []
+                for item in ary:
+                    new_ary.append((item-_min)/(_max-_min))
+                return new_ary, _min, _max
+            return ary, 0, 0
+
+        kms = []
+        fuelType = []
+        transmission = []
+        ownership = []
+        manufacture = []
+        engine = []
+        seats = []
+        for d in preprocessed_data:
+            kms.append(d[0])
+            fuelType.append(d[1])
+            transmission.append(d[2])
+            ownership.append(d[3])
+            manufacture.append(d[4])
+            engine.append(d[5])
+            seats.append(d[6])
+
+        kms, self.kms_min, self.kms_max                            = normalizeMinMaxScaling(kms)
+        fuelType, self.fuelType_min, self.fuelType_max             = normalizeMinMaxScaling(fuelType)
+        transmission, self.transmission_min, self.transmission_max = normalizeMinMaxScaling(transmission)
+        ownership, self.ownership_min, self.ownership_max          = normalizeMinMaxScaling(ownership)
+        manufacture, self.manufacture_min, self.manufacture_max    = normalizeMinMaxScaling(manufacture)
+        engine, self.engine_min, self.engine_max                   = normalizeMinMaxScaling(engine)
+        seats, self.seats_min, self.seats_max                      = normalizeMinMaxScaling(seats)
+
+        self.X = []
+        if len(kms) == len(fuelType) and len(kms) == len(transmission) and len(kms) == len(ownership) and len(kms) == len(engine) and len(kms) == len(seats):
+            for idx in range(0, len(kms)):
+                self.X.append(
+                    [
+                        kms[idx],
+                        fuelType[idx],
+                        transmission[idx],
+                        ownership[idx],
+                        manufacture[idx],
+                        engine[idx],
+                        seats[idx],
+                    ])
+
+
+        # print(self.price)
+        # print(self.fuelType)
+        # print(self.transmission)
+        # print(self.ownership)
+        # print(self.manufacture)
+        # print(self.engine)
+        # print(self.seats)
+
+
+
 
 def main():
-    independentVariablesArray = [
-            [0, 0],
-            [1, 0],
-            [0, 1],
-            [1, 1]
-            ]
-    dependantVariables = [ 0, 1, 1, 0 ]
-
-    LR = 0.001
-    N = 10000
-    model, errorArray = train_neural_network(independentVariablesArray, dependantVariables, LR, N)
-    model.draw()
-
-    plt.plot(errorArray)
-    plt.savefig('data/BatchGradientDescent_MSE.pdf', dpi=150)
-    plt.show()
-
-    rValue = estimate_r_squared(model, independentVariablesArray, dependantVariables)
-
-    with open("data/ModelParameters.json", 'w') as file:
-        if [] == errorArray:
-            dictionary={"learningRate":LR, "iterations":N, "final mse":errorArray, "r value":rValue, "neural network": json.loads(str(model))}
-        else:
-            dictionary={"learningRate":LR, "iterations":N, "final mse":errorArray[-1], "r value":rValue, "neural network": json.loads(str(model))}
-
-        json.dump(dictionary, file, indent=2)
-
-    i = 0
-    for var in independentVariablesArray:
-        print("Ran model, got {}, should be {}".format(use_model(model, var[0], var[1]), dependantVariables[i]))
-        i = i + 1
+    loader = CarPricePredictor()
+    loader.open("Data.csv")
+    loader.process()
+    print(loader.X)
+    print(loader.Y)
 
 if __name__=="__main__":
     main()
+
 
