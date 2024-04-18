@@ -81,52 +81,61 @@ class CarPricePredictor:
         valid = True
         item = []
         try:
-            __milage = self.__processMilage(milage)
-            valid = valid and validateMilage(__milage)
-            item.append(self.normalizeMinMaxScalingValue(__milage, self.kms_min, self.kms_max))
+            if self.useMilage:
+                __milage = self.__processMilage(milage)
+                valid = valid and validateMilage(__milage)
+                item.append(self.normalizeMinMaxScalingValue(__milage, self.kms_min, self.kms_max))
         except Exception as e:
             print(e)
 
         try:
-            __fuelType = self.__processFuelType(fuelType)
-            item.append(self.normalizeMinMaxScalingValue(__fuelType, self.fuelType_min, self.fuelType_max))
+            if self.useFuelType:
+                __fuelType = self.__processFuelType(fuelType)
+                item.append(self.normalizeMinMaxScalingValue(__fuelType, self.fuelType_min, self.fuelType_max))
         except Exception as e:
             print(e)
 
         try:
-            __transmission = self.__processTransmission(transmission)
-            item.append(self.normalizeMinMaxScalingValue(__transmission, self.transmission_min, self.transmission_max))
+            if self.useTransmission:
+                __transmission = self.__processTransmission(transmission)
+                item.append(self.normalizeMinMaxScalingValue(__transmission, self.transmission_min, self.transmission_max))
         except Exception as e:
             print(e)
 
         try:
-            __ownership = self.__processOwnership(ownership)
-            item.append(self.normalizeMinMaxScalingValue(__ownership, self.ownership_min, self.ownership_max))
+            if self.useOwnership:
+                __ownership = self.__processOwnership(ownership)
+                item.append(self.normalizeMinMaxScalingValue(__ownership, self.ownership_min, self.ownership_max))
         except Exception as e:
             print(e)
 
         try:
-            __manufacture = self.__processManufacture(manufactureYear)
-            valid = valid and validateManufactureYear(__manufacture)
-            item.append(self.normalizeMinMaxScalingValue(__manufacture, self.manufacture_min, self.manufacture_max))
+            if self.useManufacture:
+                __manufacture = self.__processManufacture(manufactureYear)
+                valid = valid and validateManufactureYear(__manufacture)
+                item.append(self.normalizeMinMaxScalingValue(__manufacture, self.manufacture_min, self.manufacture_max))
         except Exception as e:
             print(e)
 
         try:
-            __engine = self.__processEngine(engine)
-            valid = valid and validateEngine(__engine)
-            item.append(self.normalizeMinMaxScalingValue(__engine, self.engine_min, self.engine_max))
+            if self.useEngine:
+                __engine = self.__processEngine(engine)
+                valid = valid and validateEngine(__engine)
+                item.append(self.normalizeMinMaxScalingValue(__engine, self.engine_min, self.engine_max))
         except Exception as e:
             print(e)
 
         try:
-            __seats = self.__processSeats(seats)
-            item.append(self.normalizeMinMaxScalingValue(__seats, self.seats_min, self.seats_max))
+            if self.useSeats:
+                __seats = self.__processSeats(seats)
+                item.append(self.normalizeMinMaxScalingValue(__seats, self.seats_min, self.seats_max))
         except Exception as e:
             valid = False
             print(e)
 
         if valid:
+            print("$")
+            print(item)
             inputTens = tf.constant([item], dtype=tf.float32)
             return self.model.predict(inputTens)[0][0]
         else:
@@ -141,7 +150,8 @@ class CarPricePredictor:
         useOwnership = True,
         useManufacture = True,
         useEngine = True,
-        useSeats = True):
+        useSeats = True
+        ):
 
         self.useMilage = useMilage
         self.useFuelType = useFuelType
@@ -498,11 +508,27 @@ class CarPricePredictor:
         _7seats = 7
         _8seats = 8
 
-    def process(self):
+    def process(self,
+        useMilage = True,
+        useFuelType = True,
+        useTransmission = True,
+        useOwnership = True,
+        useManufacture = True,
+        useEngine = True,
+        useSeats = True
+        ):
 
         self.X = []
         self.Y = []
-        self.__learn()
+        self.__learn(
+            useMilage,
+            useFuelType,
+            useTransmission,
+            useOwnership,
+            useManufacture,
+            useEngine,
+            useSeats
+            )
 
 def predict(predictor, arrayItem):
     # ['BMW 5 Series 520d M Sport', '31.90 Lakh', '42,000 kms', 'Diesel', 'Automatic', '2nd Owner', '2017', '1991 cc', '5 Seats']
@@ -530,7 +556,7 @@ def predict(predictor, arrayItem):
 def main():
     predictor = CarPricePredictor()
     predictor.open("Data.csv")
-    predictor.process()
+    predictor.process(useEngine = False)
 
     print(predictor.X[-1])
     print(predictor.Y[-1])
