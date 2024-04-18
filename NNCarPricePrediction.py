@@ -148,6 +148,7 @@ class CarPricePredictor:
             self.model.fit(
                 X, # Input training data
                 Y, # Output training data
+                batch_size=3,
                 epochs=2000, # Amount of iterations we want to train for
                 verbose=1 # Amount of detail you want shown in terminal while training
             )
