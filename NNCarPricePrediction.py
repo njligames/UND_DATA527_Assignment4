@@ -99,7 +99,7 @@ class CarPricePredictor:
                     self.normalizeMinMaxScalingValue(_seats, self.seats_min, self.seats_max)
                     ]
                 inputTens = tf.constant([_input], dtype=tf.float32)
-                print(inputTens)
+                # print(inputTens)
                 ans = self.model.predict(inputTens)
                 return ans
 
@@ -123,12 +123,37 @@ class CarPricePredictor:
             # Add our layers
 
             self.model.add(layers.Dense(
-                14, # Amount of Neurons
+                28, # Amount of Neurons
                 input_dim=7, # Define an input dimension because this is the first layer
                 activation='relu' # Use relu activation function because all inputs are positive
             ))
+
             self.model.add(layers.Dense(
-                14, # Amount of Neurons. We want one output
+                28, # Amount of Neurons. We want one output
+                activation='relu' # Use sigmoid because we want to output a binary classification
+            ))
+            self.model.add(layers.Dense(
+                28, # Amount of Neurons. We want one output
+                activation='relu' # Use sigmoid because we want to output a binary classification
+            ))
+            self.model.add(layers.Dense(
+                28, # Amount of Neurons. We want one output
+                activation='relu' # Use sigmoid because we want to output a binary classification
+            ))
+            self.model.add(layers.Dense(
+                28, # Amount of Neurons. We want one output
+                activation='relu' # Use sigmoid because we want to output a binary classification
+            ))
+            self.model.add(layers.Dense(
+                28, # Amount of Neurons. We want one output
+                activation='relu' # Use sigmoid because we want to output a binary classification
+            ))
+            self.model.add(layers.Dense(
+                28, # Amount of Neurons. We want one output
+                activation='relu' # Use sigmoid because we want to output a binary classification
+            ))
+            self.model.add(layers.Dense(
+                28, # Amount of Neurons. We want one output
                 activation='relu' # Use sigmoid because we want to output a binary classification
             ))
 
@@ -145,13 +170,14 @@ class CarPricePredictor:
                 metrics=['accuracy'] # Metrics are different values that you want the model to track while training
             )
 
-            self.model.fit(
+            history = self.model.fit(
                 X, # Input training data
                 Y, # Output training data
                 batch_size=3,
                 epochs=2000, # Amount of iterations we want to train for
-                verbose=1 # Amount of detail you want shown in terminal while training
+                verbose=0 # Amount of detail you want shown in terminal while training
             )
+            print(history.params)
             self.model.save(path)
 
             # print(self.Y)
