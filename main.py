@@ -44,11 +44,11 @@ else:
     model.fit(
         X, # Input training data
         Y, # Output training data
-        epochs=2000, # Amount of iterations we want to train for
+        epochs=10, # Amount of iterations we want to train for
         verbose=1 # Amount of detail you want shown in terminal while training
     )
 
-    model.save(path)
+    # model.save(path)
 
 # Our function to take in two numerical inputs and output the relevant boolean
 def cleanPredict(model, a, b):
