@@ -15,6 +15,8 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 
+import json
+
 class CarPricePredictor:
     def __init__(self):
         self.mil = {}
@@ -76,155 +78,271 @@ class CarPricePredictor:
                 return False
             return True
 
-        manufacture = self.__processManufacture(manufactureYear)
-        valid = validateMilage(milage)
-        valid = valid and validateManufactureYear(manufacture)
-        valid = valid and validateEngine(engine)
-        # valid = valid and validateSeats(seats)
+        valid = True
+        item = []
+        try:
+            __milage = self.__processMilage(milage)
+            valid = valid and validateMilage(__milage)
+            item.append(self.normalizeMinMaxScalingValue(__milage, self.kms_min, self.kms_max))
+        except Exception as e:
+            print(e)
+
+        try:
+            __fuelType = self.__processFuelType(fuelType)
+            item.append(self.normalizeMinMaxScalingValue(__fuelType, self.fuelType_min, self.fuelType_max))
+        except Exception as e:
+            print(e)
+
+        try:
+            __transmission = self.__processTransmission(transmission)
+            item.append(self.normalizeMinMaxScalingValue(__transmission, self.transmission_min, self.transmission_max))
+        except Exception as e:
+            print(e)
+
+        try:
+            __ownership = self.__processOwnership(ownership)
+            item.append(self.normalizeMinMaxScalingValue(__ownership, self.ownership_min, self.ownership_max))
+        except Exception as e:
+            print(e)
+
+        try:
+            __manufacture = self.__processManufacture(manufactureYear)
+            valid = valid and validateManufactureYear(__manufacture)
+            item.append(self.normalizeMinMaxScalingValue(__manufacture, self.manufacture_min, self.manufacture_max))
+        except Exception as e:
+            print(e)
+
+        try:
+            __engine = self.__processEngine(engine)
+            valid = valid and validateEngine(__engine)
+            item.append(self.normalizeMinMaxScalingValue(__engine, self.engine_min, self.engine_max))
+        except Exception as e:
+            print(e)
+
+        try:
+            __seats = self.__processSeats(seats)
+            item.append(self.normalizeMinMaxScalingValue(__seats, self.seats_min, self.seats_max))
+        except Exception as e:
+            valid = False
+            print(e)
 
         if valid:
-            try:
-                _fuelType = CarPricePredictor.FuelType(fuelType).value
-                _transmission = CarPricePredictor.Transmission(transmission).value
-                _ownership = CarPricePredictor.Ownership(ownership).value
-                _seats = CarPricePredictor.Seats(seats).value
+            inputTens = tf.constant([item], dtype=tf.float32)
+            return self.model.predict(inputTens)[0][0]
+        else:
+            print("Invalid Input")
 
-                _input = [
-                    self.normalizeMinMaxScalingValue(milage, self.kms_min, self.kms_max),
-                    self.normalizeMinMaxScalingValue(_fuelType, self.fuelType_min, self.fuelType_max),
-                    self.normalizeMinMaxScalingValue(_transmission, self.transmission_min, self.transmission_max),
-                    self.normalizeMinMaxScalingValue(_ownership, self.ownership_min, self.ownership_max),
-                    self.normalizeMinMaxScalingValue(manufacture, self.manufacture_min, self.manufacture_max),
-                    self.normalizeMinMaxScalingValue(engine, self.engine_min, self.engine_max),
-                    self.normalizeMinMaxScalingValue(_seats, self.seats_min, self.seats_max)
-                    ]
-                inputTens = tf.constant([_input], dtype=tf.float32)
-                print(inputTens)
-                ans = self.model.predict(inputTens)
-                return ans
-
-            except Exception as e:
-                print(e)
-            return None
         return None
 
-    def __learn(self):
-        path = 'my_model.keras'
-        self.model = None
-        if os.path.isfile(path):
-            self.model = tf.keras.models.load_model(path)
-        else:
-            X = tf.constant(self.X, dtype=tf.float32)
-            Y = tf.constant(self.Y, dtype=tf.float32)
+    def __learn(self,
+        useMilage = True,
+        useFuelType = True,
+        useTransmission = True,
+        useOwnership = True,
+        useManufacture = True,
+        useEngine = True,
+        useSeats = True):
 
-            # Create a new Sequential Model
-            self.model = keras.Sequential()
+        self.useMilage = useMilage
+        self.useFuelType = useFuelType
+        self.useTransmission = useTransmission
+        self.useOwnership = useOwnership
+        self.useManufacture = useManufacture
+        self.useEngine = useEngine
+        self.useSeats = useSeats
 
-            # Add our layers
+        # Car Name,Car Prices (In rupee),kms Driven,Fuel Type,Transmission,Ownership, Manufacture,Engine,Seats
+        preprocessed_data = []
+        for i in range(0, len(self.data)):
+            # self.data[i][0] = processCarName(self.data[i][0])
+            carPrice = self.__processCarPrice(self.data[i][1])
+            milage = self.__processMilage(self.data[i][2])
+            fuelType = self.__processFuelType(self.data[i][3])
+            transmission = self.__processTransmission(self.data[i][4])
+            ownership = self.__processOwnership(self.data[i][5])
+            manufacture = self.__processManufacture(self.data[i][6])
+            engine = self.__processEngine(self.data[i][7])
+            seats = self.__processSeats(self.data[i][8])
 
-            self.model.add(layers.Dense(
-                14, # Amount of Neurons
-                input_dim=7, # Define an input dimension because this is the first layer
-                activation='relu' # Use relu activation function because all inputs are positive
-            ))
-            self.model.add(layers.Dense(
-                14, # Amount of Neurons. We want one output
-                activation='relu' # Use sigmoid because we want to output a binary classification
-            ))
+            valid = None != carPrice
+            valid = valid and None != milage
+            valid = valid and None != fuelType
+            valid = valid and None != transmission
+            valid = valid and None != ownership
+            valid = valid and None != manufacture
+            valid = valid and None != engine
+            valid = valid and None != seats
 
-            self.model.add(layers.Dense(
-                1, # Amount of Neurons. We want one output
-                activation='linear' # Use sigmoid because we want to output a binary classification
-            ))
+            if valid:
+                self.Y.append([carPrice])
+                preprocessed_data.append(
+                    [
+                        # self.data[i][0], # Car Name
+                        # carPrice, # Car Prices (In rupee)
+                        milage, # kms Driven
+                        fuelType, # Fuel Type
+                        transmission, # Transmission
+                        ownership, # Ownership
+                        manufacture, # Manufacture
+                        engine, # Engine
+                        seats, # Seats
+                    ])
 
-            # Compile our layers into a model
+        kms = []
+        fuelType = []
+        transmission = []
+        ownership = []
+        manufacture = []
+        engine = []
+        seats = []
+        for d in preprocessed_data:
+            kms.append(d[0])
+            fuelType.append(d[1])
+            transmission.append(d[2])
+            ownership.append(d[3])
+            manufacture.append(d[4])
+            engine.append(d[5])
+            seats.append(d[6])
 
-            self.model.compile(
-                loss='mean_squared_error', # The loss function that is being minimized
-                optimizer='adam', # Our optimization function
-                metrics=['accuracy'] # Metrics are different values that you want the model to track while training
-            )
+        kms, self.kms_min, self.kms_max                            = self.normalizeMinMaxScaling(kms)
+        fuelType, self.fuelType_min, self.fuelType_max             = self.normalizeMinMaxScaling(fuelType)
+        transmission, self.transmission_min, self.transmission_max = self.normalizeMinMaxScaling(transmission)
+        ownership, self.ownership_min, self.ownership_max          = self.normalizeMinMaxScaling(ownership)
+        manufacture, self.manufacture_min, self.manufacture_max    = self.normalizeMinMaxScaling(manufacture)
+        engine, self.engine_min, self.engine_max                   = self.normalizeMinMaxScaling(engine)
+        seats, self.seats_min, self.seats_max                      = self.normalizeMinMaxScaling(seats)
 
-            self.model.fit(
-                X, # Input training data
-                Y, # Output training data
-                batch_size=3,
-                epochs=2000, # Amount of iterations we want to train for
-                verbose=1 # Amount of detail you want shown in terminal while training
-            )
-            self.model.save(path)
+        if len(kms) == len(fuelType) and len(kms) == len(transmission) and len(kms) == len(ownership) and len(kms) == len(engine) and len(kms) == len(seats):
+            for idx in range(0, len(kms)):
+                item = []
+                if self.useMilage:
+                    item.append(kms[idx])
+                if self.useFuelType:
+                    item.append(fuelType[idx])
+                if self.useTransmission:
+                    item.append(transmission[idx])
+                if self.useOwnership:
+                    item.append(ownership[idx])
+                if self.useManufacture:
+                    item.append(manufacture[idx])
+                if self.useEngine:
+                    item.append(engine[idx])
+                if self.useSeats:
+                    item.append(seats[idx])
+                self.X.append(item)
 
-            # print(self.Y)
-            # X = tf.constant(self.X, dtype=tf.float32)
-            # Y = tf.constant(self.Y, dtype=tf.float32)
+            def createModelFilename():
+                path = "data/_"
+                if self.useMilage:
+                    path += "milage_"
+                if self.useFuelType:
+                    path += "fueltype_"
+                if self.useTransmission:
+                    path += "transmission_"
+                if self.useOwnership:
+                    path += "ownership_"
+                if self.useManufacture:
+                    path += "manufacture_"
+                if self.useEngine:
+                    path += "engine_"
+                if self.useSeats:
+                    path += "seats_"
+                path += "model"
+                return path
 
-            # # # Define the input layer
-            # input_layer = tf.keras.Input(shape=(7,))
+            path = createModelFilename() + ".keras"
+            self.model = None
+            if os.path.isfile(path):
+                self.model = tf.keras.models.load_model(path)
 
-            # # # Define the hidden layers
-            # hidden_layer_1 = tf.keras.layers.Dense(128, activation='relu')(input_layer)
-            # hidden_layer_2 = tf.keras.layers.Dense(128, activation='relu')(hidden_layer_1)
-            # hidden_layer_3 = tf.keras.layers.Dense(128, activation='relu')(hidden_layer_2)
-            # hidden_layer_4 = tf.keras.layers.Dense(128, activation='relu')(hidden_layer_3)
+                jsonPath = createModelFilename() + ".txt"
+                with open(jsonPath, 'r') as file:
+                    dictionary = json.load(file)
 
-            # # # Define the output layer
-            # output_layer = tf.keras.layers.Dense(1, activation='sigmoid')(hidden_layer_4)
+                    self.useMilage = dictionary["useMilage"]
+                    self.useFuelType = dictionary["useFuelType"]
+                    self.useTransmission = dictionary["useTransmission"]
+                    self.useOwnership = dictionary["useOwnership"]
+                    self.useManufacture = dictionary["useManufacture"]
+                    self.useEngine = dictionary["useEngine"]
+                    self.useSeats = dictionary["useSeats"]
+            else:
+                X = tf.constant(self.X, dtype=tf.float32)
+                Y = tf.constant(self.Y, dtype=tf.float32)
 
-            # # # Compile the model
-            # self.model = tf.keras.Model(inputs=input_layer, outputs=output_layer)
-            # self.model.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
+                # Create a new Sequential Model
+                self.model = keras.Sequential()
 
-            # # # Train the model
-            # self.model.fit(X, Y, epochs=20)
+                # Add our layers
+                def countDimensions():
+                    count = 0
+                    if self.useMilage:
+                        count = count + 1
 
-            # # # Evaluate the model
-            # print(self.model.evaluate(X, Y))
-            # # self.model.save(path)
+                    if self.useFuelType:
+                        count = count + 1
 
+                    if self.useTransmission:
+                        count = count + 1
 
-            # Define our training input and output data with type 16 bit float
-            # Each input maps to an output
+                    if self.useOwnership:
+                        count = count + 1
 
-            # X = tf.constant([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=tf.float16)
-            # Y = tf.constant([[0], [1], [1], [0]], dtype=tf.float16)
-            # X = tf.constant(self.X, dtype=tf.float16)
-            # Y = tf.constant(self.Y, dtype=tf.float16)
+                    if self.useManufacture:
+                        count = count + 1
 
-            # Create a new Sequential Model
-            # self.model = keras.Sequential()
+                    if self.useEngine:
+                        count = count + 1
 
-            # Add our layers
+                    if self.useSeats:
+                        count = count + 1
 
-            # self.model.add(layers.Dense(
-            #     14, # Amount of Neurons
-            #     input_dim=7, # Define an input dimension because this is the first layer
-            #     activation='relu' # Use relu activation function because all inputs are positive
-            # ))
+                    return count
 
-            # self.model.add(layers.Dense(
-            #     1, # Amount of Neurons. We want one output
-            #     activation='sigmoid' # Use sigmoid because we want to output a binary classification
-            # ))
+                self.model.add(layers.Dense(
+                    14, # Amount of Neurons
+                    input_dim=countDimensions(), # Define an input dimension because this is the first layer
+                    activation='relu' # Use relu activation function because all inputs are positive
+                ))
+                self.model.add(layers.Dense(
+                    14, # Amount of Neurons. We want one output
+                    activation='relu' # Use sigmoid because we want to output a binary classification
+                ))
 
+                self.model.add(layers.Dense(
+                    1, # Amount of Neurons. We want one output
+                    activation='linear' # Use sigmoid because we want to output a binary classification
+                ))
 
+                # Compile our layers into a model
 
-            # Compile our layers into a model
+                self.model.compile(
+                    loss='mean_squared_error', # The loss function that is being minimized
+                    optimizer='adam', # Our optimization function
+                    metrics=['accuracy'] # Metrics are different values that you want the model to track while training
+                )
 
-            # self.model.compile(
-            #     loss='mean_squared_error', # The loss function that is being minimized
-            #     optimizer='adam', # Our optimization function
-            #     metrics=['binary_accuracy'] # Metrics are different values that you want the model to track while training
-            # )
+                self.model.fit(
+                    X, # Input training data
+                    Y, # Output training data
+                    batch_size=3,
+                    epochs=2000, # Amount of iterations we want to train for
+                    verbose=1 # Amount of detail you want shown in terminal while training
+                )
+                self.model.save(path)
+                jsonPath = createModelFilename() + ".txt"
+                with open(jsonPath, 'w') as file:
+                    dictionary = {
+                        "useMilage":self.useMilage,
+                        "useFuelType":self.useFuelType,
+                        "useTransmission":self.useTransmission,
+                        "useOwnership":self.useOwnership,
+                        "useManufacture":self.useManufacture,
+                        "useEngine":self.useEngine,
+                        "useSeats":self.useSeats
+                    }
+                    json.dump(dictionary, file, indent=2)
 
-            # self.model.fit(
-            #     X, # Input training data
-            #     Y, # Output training data
-            #     epochs=10, # Amount of iterations we want to train for
-            #     verbose=0 # Amount of detail you want shown in terminal while training
-            # )
-
-            # self.model.save(path)
-            # print(self.model.evaluate(X, Y))
 
     def __processCarName(self, var):
         return var
@@ -382,99 +500,11 @@ class CarPricePredictor:
 
     def process(self):
 
-        preprocessed_data = []
-        self.Y = []
-        # Car Name,Car Prices (In rupee),kms Driven,Fuel Type,Transmission,Ownership, Manufacture,Engine,Seats
-        for i in range(0, len(self.data)):
-            # self.data[i][0] = processCarName(self.data[i][0])
-            self.data[i][1] = self.__processCarPrice(self.data[i][1])
-            # print(self.data[i][1])
-            self.data[i][2] = self.__processMilage(self.data[i][2])
-            # print(self.data[i][2])
-            self.data[i][3] = self.__processFuelType(self.data[i][3])
-            # print(self.data[i][3])
-            self.data[i][4] = self.__processTransmission(self.data[i][4])
-            self.data[i][5] = self.__processOwnership(self.data[i][5])
-            self.data[i][6] = self.__processManufacture(self.data[i][6])
-            self.data[i][7] = self.__processEngine(self.data[i][7])
-            self.data[i][8] = self.__processSeats(self.data[i][8])
-
-            if None != self.data[i][1] and None != self.data[i][2] and None != self.data[i][3] and None != self.data[i][4] and None != self.data[i][5] and None != self.data[i][6] and None != self.data[i][7] and None != self.data[i][8]:
-                self.Y.append([self.data[i][1]])
-                preprocessed_data.append(
-                    [
-                        # self.data[i][0], # Car Name
-                        # self.data[i][1], # Car Prices (In rupee)
-                        self.data[i][2], # kms Driven
-                        self.data[i][3], # Fuel Type
-                        self.data[i][4], # Transmission
-                        self.data[i][5], # Ownership
-                        self.data[i][6], # Manufacture
-                        self.data[i][7], # Engine
-                        self.data[i][8], # Seats
-                    ])
-
-
-
-        kms = []
-        fuelType = []
-        transmission = []
-        ownership = []
-        manufacture = []
-        engine = []
-        seats = []
-        for d in preprocessed_data:
-            kms.append(d[0])
-            fuelType.append(d[1])
-            transmission.append(d[2])
-            ownership.append(d[3])
-            manufacture.append(d[4])
-            engine.append(d[5])
-            seats.append(d[6])
-
-        kms, self.kms_min, self.kms_max                            = self.normalizeMinMaxScaling(kms)
-        fuelType, self.fuelType_min, self.fuelType_max             = self.normalizeMinMaxScaling(fuelType)
-        transmission, self.transmission_min, self.transmission_max = self.normalizeMinMaxScaling(transmission)
-        ownership, self.ownership_min, self.ownership_max          = self.normalizeMinMaxScaling(ownership)
-        manufacture, self.manufacture_min, self.manufacture_max    = self.normalizeMinMaxScaling(manufacture)
-        engine, self.engine_min, self.engine_max                   = self.normalizeMinMaxScaling(engine)
-        seats, self.seats_min, self.seats_max                      = self.normalizeMinMaxScaling(seats)
-
         self.X = []
-        if len(kms) == len(fuelType) and len(kms) == len(transmission) and len(kms) == len(ownership) and len(kms) == len(engine) and len(kms) == len(seats):
-            for idx in range(0, len(kms)):
-                self.X.append(
-                    [
-                        kms[idx],
-                        fuelType[idx],
-                        transmission[idx],
-                        ownership[idx],
-                        manufacture[idx],
-                        engine[idx],
-                        seats[idx],
-                    ])
-            self.__learn()
+        self.Y = []
+        self.__learn()
 
-        # print(self.mil)
-        # print(self.price)
-        # print(self.fuelType)
-        # print(self.transmission)
-        # print(self.ownership)
-        # print(self.manufacture)
-        # print(self.engine)
-        # print(self.seats)
-
-
-
-
-
-def main():
-    predictor = CarPricePredictor()
-    predictor.open("Data.csv")
-    predictor.process()
-    # print(predictor.X)
-    # print(predictor.Y)
-
+def predict(predictor, arrayItem):
     # ['BMW 5 Series 520d M Sport', '31.90 Lakh', '42,000 kms', 'Diesel', 'Automatic', '2nd Owner', '2017', '1991 cc', '5 Seats']
     milage = 42_000
     fuelType = CarPricePredictor.FuelType.diesel
@@ -483,13 +513,36 @@ def main():
     manufactureYear = 2017
     engine = 1991
     seats = CarPricePredictor.Seats._5seats
+
+    print(arrayItem)
+    # ['BMW 5 Series 520d M Sport', '31.90 Lakh', '42,000 kms', 'Diesel', 'Automatic', '2nd Owner', '2017', '1991 cc', '5 Seats']
+    milage = arrayItem[2]
+    fuelType = arrayItem[3]
+    transmission = arrayItem[4]
+    ownership = arrayItem[5]
+    manufactureYear = arrayItem[6]
+    engine = arrayItem[7]
+    seats = arrayItem[8]
     price = predictor.predictPrice(milage, fuelType, transmission, ownership, manufactureYear, engine, seats)
+
+    return price
+
+def main():
+    predictor = CarPricePredictor()
+    predictor.open("Data.csv")
+    predictor.process()
+
+    print(predictor.X[-1])
+    print(predictor.Y[-1])
 
     # 42000 1 2 2 2017 1991 5
     # 38280.0
-    print("#############")
-    print(price)
-    print("#############")
+    price = predict(predictor, predictor.data[-1])
+    print("predicted price: " + str(price))
+
+
+
+
 
 if __name__=="__main__":
     main()
