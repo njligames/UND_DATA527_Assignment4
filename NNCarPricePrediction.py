@@ -337,7 +337,7 @@ class CarPricePredictor:
                     Y, # Output training data
                     batch_size=3,
                     epochs=2000, # Amount of iterations we want to train for
-                    verbose=1 # Amount of detail you want shown in terminal while training
+                    verbose=0 # Amount of detail you want shown in terminal while training
                 )
                 self.model.save(path)
                 jsonPath = createModelFilename() + ".txt"
@@ -553,7 +553,49 @@ def predict(predictor, arrayItem):
 
     return price
 
+def createModels():
+    predictor = CarPricePredictor()
+    predictor.open("Data.csv")
+
+    for i in range(0,128):
+        print("Building model: {} of 128".format(i+1))
+
+        useMilage = False
+        useFuelType = False
+        useTransmission = False
+        useOwnership = False
+        useManufacture = False
+        useEngine = False
+        useSeats = False
+
+        if (i & (1<<0)) != 0:
+            useMilage = True
+
+        if (i & (1<<1)) != 0:
+            useFuelType = True
+
+        if (i & (1<<2)) != 0:
+            useTransmission = True
+
+        if (i & (1<<3)) != 0:
+            useOwnership = True
+
+        if (i & (1<<4)) != 0:
+            useManufacture = True
+
+        if (i & (1<<5)) != 0:
+            useEngine = True
+
+        if (i & (1<<6)) != 0:
+            useSeats = True
+
+        predictor.process(useMilage=useMilage, useFuelType=useFuelType, useTransmission=useTransmission, useOwnership=useOwnership, useManufacture=useManufacture, useEngine=useEngine, useSeats=useSeats)
+        # print(useMilage, useFuelType, useTransmission, useOwnership, useManufacture, useEngine, useSeats)
+
+
 def main():
+    createModels()
+
     predictor = CarPricePredictor()
     predictor.open("Data.csv")
     predictor.process(useEngine = False)
