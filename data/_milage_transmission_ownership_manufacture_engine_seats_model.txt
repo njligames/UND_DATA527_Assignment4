@@ -1,0 +1,9 @@
+{
+  "useMilage": true,
+  "useFuelType": false,
+  "useTransmission": true,
+  "useOwnership": true,
+  "useManufacture": true,
+  "useEngine": true,
+  "useSeats": true
+}
