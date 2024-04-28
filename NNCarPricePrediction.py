@@ -81,63 +81,51 @@ class CarPricePredictor:
         valid = True
         item = []
         try:
-            if self.useMilage:
-                __milage = self.__processMilage(milage)
-                valid = valid and validateMilage(__milage)
-                item.append(self.normalizeMinMaxScalingValue(__milage, self.kms_min, self.kms_max))
+            if None != milage and self.useMilage:
+                item.append(milage)
         except Exception as e:
             print(e)
 
         try:
-            if self.useFuelType:
-                __fuelType = self.__processFuelType(fuelType)
-                item.append(self.normalizeMinMaxScalingValue(__fuelType, self.fuelType_min, self.fuelType_max))
+            if None != fuelType and self.useFuelType:
+                item.append(fuelType)
         except Exception as e:
             print(e)
 
         try:
-            if self.useTransmission:
-                __transmission = self.__processTransmission(transmission)
-                item.append(self.normalizeMinMaxScalingValue(__transmission, self.transmission_min, self.transmission_max))
+            if None != transmission and self.useTransmission:
+                item.append(transmission)
         except Exception as e:
             print(e)
 
         try:
-            if self.useOwnership:
-                __ownership = self.__processOwnership(ownership)
-                item.append(self.normalizeMinMaxScalingValue(__ownership, self.ownership_min, self.ownership_max))
+            if None != ownership and self.useOwnership:
+                item.append(ownership)
         except Exception as e:
             print(e)
 
         try:
-            if self.useManufacture:
-                __manufacture = self.__processManufacture(manufactureYear)
-                valid = valid and validateManufactureYear(__manufacture)
-                item.append(self.normalizeMinMaxScalingValue(__manufacture, self.manufacture_min, self.manufacture_max))
+            if None != manufactureYear and self.useManufacture:
+                item.append(manufactureYear)
         except Exception as e:
             print(e)
 
         try:
-            if self.useEngine:
-                __engine = self.__processEngine(engine)
-                valid = valid and validateEngine(__engine)
-                item.append(self.normalizeMinMaxScalingValue(__engine, self.engine_min, self.engine_max))
+            if None != engine and self.useEngine:
+                item.append(engine)
         except Exception as e:
             print(e)
 
         try:
-            if self.useSeats:
-                __seats = self.__processSeats(seats)
-                item.append(self.normalizeMinMaxScalingValue(__seats, self.seats_min, self.seats_max))
+            if None != seats and self.useSeats:
+                item.append(seats)
         except Exception as e:
             valid = False
             print(e)
 
         if valid:
-            print("$")
-            print(item)
             inputTens = tf.constant([item], dtype=tf.float32)
-            return self.model.predict(inputTens)[0][0]
+            return self.model.predict(inputTens, verbose=0)[0][0]
         else:
             print("Invalid Input")
 
@@ -530,35 +518,62 @@ class CarPricePredictor:
             useSeats
             )
 
-def predict(predictor, arrayItem):
-    # ['BMW 5 Series 520d M Sport', '31.90 Lakh', '42,000 kms', 'Diesel', 'Automatic', '2nd Owner', '2017', '1991 cc', '5 Seats']
-    milage = 42_000
-    fuelType = CarPricePredictor.FuelType.diesel
-    transmission = CarPricePredictor.Transmission.automatic
-    ownership = CarPricePredictor.Ownership._2ndowner
-    manufactureYear = 2017
-    engine = 1991
-    seats = CarPricePredictor.Seats._5seats
+def loadRValues(path):
+    r_values = None
+    if os.path.isfile(path):
+        with open(path, 'r') as openfile:
+            r_values = json.load(openfile)
+    if None == r_values:
+        r_values = []
+    return r_values
 
-    print(arrayItem)
-    # ['BMW 5 Series 520d M Sport', '31.90 Lakh', '42,000 kms', 'Diesel', 'Automatic', '2nd Owner', '2017', '1991 cc', '5 Seats']
-    milage = arrayItem[2]
-    fuelType = arrayItem[3]
-    transmission = arrayItem[4]
-    ownership = arrayItem[5]
-    manufactureYear = arrayItem[6]
-    engine = arrayItem[7]
-    seats = arrayItem[8]
-    price = predictor.predictPrice(milage, fuelType, transmission, ownership, manufactureYear, engine, seats)
+"""
+Calculate coorelation coefficient..
 
-    return price
+Parameters:
+- y_try: List of actual values.
+- y_pred: List of predicted values.
 
-def createModels():
+Returns:
+- r_squared: The coorelation coefficient.
+"""
+def calculate_r_squared(y_true, y_pred):
+    if len(y_true) != len(y_pred):
+        raise ValueError("Length of dependant values and predicted values must be the same.")
+
+    # Calculate the mean of the true values
+    mean_y_true = sum(y_true) / len(y_true)
+
+    # Calculate the total sum of squares (TSS) without using sum
+    tss = 0
+    for y in y_true:
+        tss += (y - mean_y_true) ** 2
+
+    # Calculate the residual sum of squares (RSS) without using sum
+    rss = 0
+    for true_val, pred_val in zip(y_true, y_pred):
+        rss += (true_val - pred_val) ** 2
+
+    # Calculate R-squared
+    r_squared = 1 - (rss / tss)
+
+    return r_squared
+
+def predictModels():
+
+    def appendRValue(path, r_values, val):
+        r_values.append(val)
+        with open(path, "w") as outfile:
+            json.dump(r_values, outfile)
+
     predictor = CarPricePredictor()
     predictor.open("Data.csv")
 
-    for i in range(0,128):
-        print("Building model: {} of 128".format(i+1))
+    path = "data/r_values.json"
+    r_values = loadRValues(path)
+
+    k = 0
+    for i in range(len(r_values), 128):
 
         useMilage = False
         useFuelType = False
@@ -590,26 +605,189 @@ def createModels():
             useSeats = True
 
         predictor.process(useMilage=useMilage, useFuelType=useFuelType, useTransmission=useTransmission, useOwnership=useOwnership, useManufacture=useManufacture, useEngine=useEngine, useSeats=useSeats)
-        # print(useMilage, useFuelType, useTransmission, useOwnership, useManufacture, useEngine, useSeats)
 
+        actual_prices = []
+        for item in predictor.Y:
+            actual_prices.append(item[0])
 
-def main():
-    createModels()
+        predicted_prices = []
+        for j in range(0, len(predictor.X)):
 
+            print("({}/{}) - ({}/{});".format(i, 127, j+1, len(predictor.X)))
+            k = k + 1
+
+            idx = 0
+            if useMilage:
+                milage = predictor.X[j][idx]
+                idx = idx + 1
+            else:
+                milage = None
+
+            if useFuelType:
+                fuelType = predictor.X[j][idx]
+                idx = idx + 1
+            else:
+                fuelType = None
+
+            if useTransmission:
+                transmission = predictor.X[j][idx]
+                idx = idx + 1
+            else:
+                transmission = None
+
+            if useOwnership:
+                ownership = predictor.X[j][idx]
+                idx = idx + 1
+            else:
+                ownership = None
+
+            if useManufacture:
+                manufactureYear = predictor.X[j][idx]
+                idx = idx + 1
+            else:
+                manufactureYear = None
+
+            if useEngine:
+                engine = predictor.X[j][idx]
+                idx = idx + 1
+            else:
+                engine = None
+
+            if useSeats:
+                seats = predictor.X[j][idx]
+                idx = idx + 1
+            else:
+                seats = None
+
+            price = predictor.predictPrice(milage, fuelType, transmission, ownership, manufactureYear, engine, seats)
+            predicted_prices.append(price)
+
+        val = {
+            "index":i,
+            "r_value":calculate_r_squared(actual_prices, predicted_prices),
+            "useMilage":useMilage,
+            "useFuelType":useFuelType,
+            "useTransmission":useTransmission,
+            "useOwnership":useOwnership,
+            "useManufacture":useManufacture,
+            "useEngine":useEngine,
+            "useSeats":useSeats
+        }
+        appendRValue(path, r_values, val)
+
+def writeCSV():
+    path = "data/r_values.json"
+    r_values = loadRValues(path)
+
+    # field names
+    fields = ['useMilage', 'useFuelType', 'useTransmission', "useOwnership", "useManufacture", "useEngine", "useSeats", "Coorelation Coefficient"]
+     
+    # name of csv file
+    filename = "data/r_values.csv"
+     
+    mydict = []
+    for item in r_values:
+        val = {
+            "useMilage":item["useMilage"], 
+            "useFuelType":item["useFuelType"], 
+            "useTransmission":item["useTransmission"], 
+            "useOwnership":item["useOwnership"], 
+            "useManufacture":item["useManufacture"], 
+            "useEngine":item["useEngine"], 
+            "useSeats":item["useSeats"], 
+            "Coorelation Coefficient":item["r_value"]
+            }
+        mydict.append(val)
+
+    # writing to csv file
+    with open(filename, 'w') as csvfile:
+        # creating a csv dict writer object
+        writer = csv.DictWriter(csvfile, fieldnames=fields)
+     
+        # writing headers (field names)
+        writer.writeheader()
+     
+        # writing data rows
+        writer.writerows(mydict)
+
+def useBestCoorelationCoefficient():
+    # useMilage  useFuelType useTransmission useOwnership    useManufacture  useEngine   useSeats    Coorelation Coefficient 
+    # TRUE       TRUE        TRUE            FALSE           TRUE            TRUE        FALSE       0.449060499
     predictor = CarPricePredictor()
     predictor.open("Data.csv")
-    predictor.process(useEngine = False)
 
-    print(predictor.X[-1])
-    print(predictor.Y[-1])
+    useMilage = True
+    useFuelType = True
+    useTransmission = True
+    useOwnership = False
+    useManufacture = True
+    useEngine = True
+    useSeats = False
 
-    # 42000 1 2 2 2017 1991 5
-    # 38280.0
-    price = predict(predictor, predictor.data[-1])
-    print("predicted price: " + str(price))
+    predictor.process(useMilage=useMilage, useFuelType=useFuelType, useTransmission=useTransmission, useOwnership=useOwnership, useManufacture=useManufacture, useEngine=useEngine, useSeats=useSeats)
 
+    actual_prices = []
+    for item in predictor.Y:
+        actual_prices.append(item[0])
 
+    predicted_prices = []
+    for j in range(0, len(predictor.X)):
 
+        print("({}/{});".format(j+1, len(predictor.X)))
+
+        idx = 0
+        if useMilage:
+            milage = predictor.X[j][idx]
+            idx = idx + 1
+        else:
+            milage = None
+
+        if useFuelType:
+            fuelType = predictor.X[j][idx]
+            idx = idx + 1
+        else:
+            fuelType = None
+
+        if useTransmission:
+            transmission = predictor.X[j][idx]
+            idx = idx + 1
+        else:
+            transmission = None
+
+        if useOwnership:
+            ownership = predictor.X[j][idx]
+            idx = idx + 1
+        else:
+            ownership = None
+
+        if useManufacture:
+            manufactureYear = predictor.X[j][idx]
+            idx = idx + 1
+        else:
+            manufactureYear = None
+
+        if useEngine:
+            engine = predictor.X[j][idx]
+            idx = idx + 1
+        else:
+            engine = None
+
+        if useSeats:
+            seats = predictor.X[j][idx]
+            idx = idx + 1
+        else:
+            seats = None
+
+        price = predictor.predictPrice(milage, fuelType, transmission, ownership, manufactureYear, engine, seats)
+        predicted_prices.append(price)
+
+    r_squared = calculate_r_squared(actual_prices, predicted_prices)
+    print(r_squared)
+
+def main():
+    # predictModels()
+    # writeCSV()
+    useBestCoorelationCoefficient()
 
 
 if __name__=="__main__":
