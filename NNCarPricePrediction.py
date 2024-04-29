@@ -791,6 +791,8 @@ def useBestCoorelationCoefficient():
     r_squared = calculate_r_squared(actual_prices, predicted_prices)
     print(r_squared)
 
+    predictor.model.summary()
+
 def main():
     # predictModels()
     # writeCSV()
