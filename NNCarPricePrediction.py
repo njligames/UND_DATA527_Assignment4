@@ -16,6 +16,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 import json
+import latexify
 
 class CarPricePredictor:
     def __init__(self):
@@ -131,6 +132,7 @@ class CarPricePredictor:
 
         return None
 
+    @latexify.function(use_set_symbols=True, identifiers=identifiers)
     def __learn(self,
         useMilage = True,
         useFuelType = True,
@@ -574,7 +576,7 @@ def predictModels(predict_prices=False):
 
     start = 0
     if predict_prices:
-        start = len(r_values) 
+        start = len(r_values)
 
     k = 0
     for i in range(start, 128):
@@ -688,20 +690,20 @@ def writeCSV():
 
     # field names
     fields = ['useMilage', 'useFuelType', 'useTransmission', "useOwnership", "useManufacture", "useEngine", "useSeats", "Coorelation Coefficient"]
-     
+
     # name of csv file
     filename = "data/r_values.csv"
-     
+
     mydict = []
     for item in r_values:
         val = {
-            "useMilage":item["useMilage"], 
-            "useFuelType":item["useFuelType"], 
-            "useTransmission":item["useTransmission"], 
-            "useOwnership":item["useOwnership"], 
-            "useManufacture":item["useManufacture"], 
-            "useEngine":item["useEngine"], 
-            "useSeats":item["useSeats"], 
+            "useMilage":item["useMilage"],
+            "useFuelType":item["useFuelType"],
+            "useTransmission":item["useTransmission"],
+            "useOwnership":item["useOwnership"],
+            "useManufacture":item["useManufacture"],
+            "useEngine":item["useEngine"],
+            "useSeats":item["useSeats"],
             "Coorelation Coefficient":item["r_value"]
             }
         mydict.append(val)
@@ -710,15 +712,15 @@ def writeCSV():
     with open(filename, 'w') as csvfile:
         # creating a csv dict writer object
         writer = csv.DictWriter(csvfile, fieldnames=fields)
-     
+
         # writing headers (field names)
         writer.writeheader()
-     
+
         # writing data rows
         writer.writerows(mydict)
 
 def useBestCoorelationCoefficient():
-    # useMilage  useFuelType useTransmission useOwnership    useManufacture  useEngine   useSeats    Coorelation Coefficient 
+    # useMilage  useFuelType useTransmission useOwnership    useManufacture  useEngine   useSeats    Coorelation Coefficient
     # TRUE       TRUE        TRUE            FALSE           TRUE            TRUE        FALSE       0.449060499
     predictor = CarPricePredictor()
     predictor.open("Data.csv")
