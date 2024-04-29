@@ -559,7 +559,7 @@ def calculate_r_squared(y_true, y_pred):
 
     return r_squared
 
-def predictModels():
+def predictModels(predict_prices=False):
 
     def appendRValue(path, r_values, val):
         r_values.append(val)
@@ -572,8 +572,12 @@ def predictModels():
     path = "data/r_values.json"
     r_values = loadRValues(path)
 
+    start = 0
+    if predict_prices:
+        start = len(r_values) 
+
     k = 0
-    for i in range(len(r_values), 128):
+    for i in range(start, 128):
 
         useMilage = False
         useFuelType = False
@@ -605,6 +609,9 @@ def predictModels():
             useSeats = True
 
         predictor.process(useMilage=useMilage, useFuelType=useFuelType, useTransmission=useTransmission, useOwnership=useOwnership, useManufacture=useManufacture, useEngine=useEngine, useSeats=useSeats)
+
+        if not predict_prices:
+            continue
 
         actual_prices = []
         for item in predictor.Y:
